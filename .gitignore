@@ -1,0 +1,4 @@
+.env
+/assets
+/dict
+/faiss_normal_ViT.bin
