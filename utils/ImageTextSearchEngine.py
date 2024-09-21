@@ -1,8 +1,7 @@
-import faiss, mysql.connector, clip, torch, requests
+import faiss, mysql.connector, clip, torch, requests, numpy as np
 from PIL import Image
 from langdetect import detect
 from io import BytesIO
-from ultralytics import YOLO
 
 
 class ImageTextSearchEngine:
@@ -12,7 +11,6 @@ class ImageTextSearchEngine:
         self.db_cursor = self.db_connection.cursor()
         self.device = device
         self.model, self.preprocess = clip.load(clip_backbone, device=device)
-        self.yolo_model = YOLO('yolov8m.pt')
         self.translator = translator
         self.text_preprocessing = text_preprocessing
         self.index = self.load_faiss_index(bin_file)
@@ -55,14 +53,22 @@ class ImageTextSearchEngine:
     
     # Search images by image
     def search_images_by_id(self, image_id, k):
-        query_vector = self.index.reconstruct(image_id).reshape(1, -1)
+        sql = "SELECT vector_features FROM image_features WHERE id = %s"
+        self.db_cursor.execute(sql, (image_id,))
+        row = self.db_cursor.fetchone()
+        
+        vector_blob = row[0]
+        query_vector = np.frombuffer(vector_blob, dtype='float32')
+        query_vector = query_vector.reshape(1, -1)
+
         _, indices = self.index.search(query_vector, k)
+
         indices = indices.flatten()
 
         if len(indices) == 0:
             return []
         
-        id_tuple = tuple(int(i) + 1 for i in indices)
+        id_tuple = tuple(int(i) for i in indices)
 
         return self.get_image_feature_by_tuple(id_tuple)
 
@@ -77,20 +83,20 @@ class ImageTextSearchEngine:
         
         text_preprocessed = self.text_preprocessing(translated_text)
 
+        print(text_preprocessed)
+
         text_tokenized = clip.tokenize(text_preprocessed).to(self.device)
 
         with torch.no_grad():
             text_vector = self.model.encode_text(text_tokenized).cpu().numpy()
             distances, indices = self.index.search(text_vector, k)
+
             indices = indices.flatten()
 
             if len(indices) == 0:
                 return []
             
-            print(indices)
-            print(distances[0])
-
-            id_tuple = tuple(int(i) + 1 for i in indices)
+            id_tuple = tuple(int(i) for i in indices)
 
             return self.get_image_feature_by_tuple(id_tuple)
 
@@ -126,7 +132,7 @@ class ImageTextSearchEngine:
             if len(indices) == 0:
                 return []
             
-            id_tuple = tuple(int(i) + 1 for i in indices)
+            id_tuple = tuple(int(i) for i in indices)
 
             return self.get_image_feature_by_tuple(id_tuple)
 

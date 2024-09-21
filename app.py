@@ -4,7 +4,8 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from flask_cors import CORS
 from utils.ImageTextSearchEngine import ImageTextSearchEngine
-from utils.Translation import Translation, TextPreprocessing
+from utils.Translation import Translation
+from utils.TextProcessor import TextProcessor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -23,13 +24,13 @@ db_config = {
 }
 
 # Load file bin
-bin_file = 'D:/demo-ai-challenge/model/faiss_normal_ViT.bin'
+bin_file = 'D:/AIC/model/faiss_normal_ViT.bin'
 
 image_text_search_engine = ImageTextSearchEngine(
     db_config=db_config,
     bin_file=bin_file,
     translator=Translation(),
-    text_preprocessing=TextPreprocessing(),
+    text_preprocessing=TextProcessor(),
     clip_backbone='ViT-B/32',
     device='cuda' if torch.cuda.is_available() else 'cpu'
 )
@@ -42,25 +43,12 @@ CORS(app=app, resources={
     }
 })
 
-
-# Load the image paths from a JSON file
-# with open('./assets/image_paths.json') as json_file:
-#     json_dict = json.load(json_file)
-
-# @app.route('/insert-all-images/', methods=['GET'])
-# def insert_all_images():
-#     for _, image_path in json_dict.items():
-#         try:
-#             image_text_search_engine.insert_image(image_path)
-#         except Exception as e:
-#             logging.error(f"Error when inserting image: {str(e)}")
-#             return jsonify({'Error': str(e)}), 500
-#     return jsonify({"Inserted all images successfully"}), 200
-
 @app.route('/image-search', methods=['GET'])
 def image_search():
-    img_id = int(request.args.get('imgId')) - 1
+    img_id = int(request.args.get('imgId'))
     k = int(request.args.get('k'))
+    print(img_id)
+    print(k)
     try:
         image_paths = image_text_search_engine.search_images_by_id(img_id, k=k)
         return jsonify({'results': image_paths}), 200
@@ -82,7 +70,7 @@ def text_search():
 
 @app.route('/similar-part-search', methods=['GET'])
 def similar_parts_search():
-    imgId = int(request.args.get('imgId')) - 1
+    imgId = int(request.args.get('imgId'))
     x1 = float(request.args.get('x1'))
     x2 = float(request.args.get('x2'))
     y1 = float(request.args.get('y1'))
