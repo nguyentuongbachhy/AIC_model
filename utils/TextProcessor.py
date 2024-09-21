@@ -1,8 +1,10 @@
-import re, spacy
+import re, spacy, nltk
 from nltk.corpus import wordnet
 from spacy.lang.en.stop_words import STOP_WORDS
 
 nlp = spacy.load('en_core_web_sm')
+# nltk.download("wordnet")
+
 
 class TextProcessor():
     def __init__(self):
