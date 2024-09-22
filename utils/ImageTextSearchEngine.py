@@ -19,7 +19,12 @@ class ImageTextSearchEngine:
         if bin_file:
             return faiss.read_index(bin_file)
         return None
-    
+
+    def normalize(self, vectors):
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        return vectors / norms
+
+
     def get_image_feature_by_tuple(self, id_tuple: tuple):
         placeholders = ','.join(['%s'] * len(id_tuple))
         order_by_case = " ".join([f"WHEN %s THEN {i}" for i in range(len(id_tuple))])
@@ -60,6 +65,7 @@ class ImageTextSearchEngine:
         vector_blob = row[0]
         query_vector = np.frombuffer(vector_blob, dtype='float32')
         query_vector = query_vector.reshape(1, -1)
+        query_vector = self.normalize(query_vector)
 
         _, indices = self.index.search(query_vector, k)
 
@@ -81,54 +87,19 @@ class ImageTextSearchEngine:
         else:
             translated_text = text
         
-        text_preprocessed = self.text_preprocessing(translated_text)
+        lemmatized_tokens = self.text_preprocessing(translated_text)
 
-        print(text_preprocessed)
+        print(lemmatized_tokens)
 
-        text_tokenized = clip.tokenize(text_preprocessed).to(self.device)
+        text_tokenized = clip.tokenize(lemmatized_tokens).to(self.device)
 
         with torch.no_grad():
             text_vector = self.model.encode_text(text_tokenized).cpu().numpy()
-            distances, indices = self.index.search(text_vector, k)
+            text_vector = self.normalize(text_vector)
+            _, indices = self.index.search(text_vector, k)
 
             indices = indices.flatten()
-
-            if len(indices) == 0:
-                return []
-            
-            id_tuple = tuple(int(i) for i in indices)
-
-            return self.get_image_feature_by_tuple(id_tuple)
-
-    # Search images by a part of image
-    def get_image_vector(self, image):
-        with torch.no_grad():
-            image_features = self.preprocess(image).unsqueeze(0).to(self.device)
-            image_vector = self.model.encode_image(image_features).cpu().numpy()
-            return image_vector
-
-    def split_image(self, image_id, x1, x2, y1, y2):
-        image_path = self.id2img_fps[image_id]
-        image = self.load_image(image_path)
-
-        return image.crop((x1, y1, x2, y2))
-
-    def load_image(self, image_path):
-        if image_path.startswith(('http://', 'https://')):
-            response = requests.get(image_path)
-            if response.status_code != 200:
-                raise ValueError(f'Unable to get image from {image_path}')
-            return Image.open(BytesIO(response.content))
-        return Image.open(image_path)
-
-    def search_similar_images_for_part(self, imgId, x1, x2, y1, y2, k):
-        part = self.split_image(image_id=imgId, x1=x1, x2=x2, y1=y1, y2=y2)
-        part_vector = self.get_image_vector(part)
-
-        with torch.no_grad():
-            _, indices = self.index.search(part_vector, k)
-            indices = indices.flatten()
-
+            print(indices)
             if len(indices) == 0:
                 return []
             

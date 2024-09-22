@@ -68,21 +68,6 @@ def text_search():
         logging.error(f'Error in text-search: {str(e)}')
         return jsonify({'Error': str(e)}), 500
 
-@app.route('/similar-part-search', methods=['GET'])
-def similar_parts_search():
-    imgId = int(request.args.get('imgId'))
-    x1 = float(request.args.get('x1'))
-    x2 = float(request.args.get('x2'))
-    y1 = float(request.args.get('y1'))
-    y2 = float(request.args.get('y2'))
-    k = int(request.args.get('k'))
-    try:
-        image_paths = image_text_search_engine.search_similar_images_for_part(imgId=imgId, x1=x1, x2=x2, y1=y1, y2=y2, k=k)
-        image_paths = [{"id": int(result["id"]), "image_path": result["image_path"]} for result in image_paths]
-        return jsonify({'results': image_paths}), 200
-    except Exception as e:
-        logging.error(f'Error in similar-part-search: {str(e)}')
-        return jsonify({'Error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

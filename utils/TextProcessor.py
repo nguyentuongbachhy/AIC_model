@@ -1,53 +1,59 @@
-import re, spacy, nltk
-from nltk.corpus import wordnet
-from spacy.lang.en.stop_words import STOP_WORDS
+import string, re, inflect, nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
 
-nlp = spacy.load('en_core_web_sm')
-# nltk.download("wordnet")
-
+nltk.download('punkt_tab')
+nltk.download('woednet')
+nltk.download('stopwords')
 
 class TextProcessor():
     def __init__(self):
         self.re = re
-        self.nlp = nlp
-        self.synsets = wordnet.synsets
-        self.stopwords = STOP_WORDS
+        self.p = inflect.engine()
+        self.stop_words = set(stopwords.words("english"))
+        self.lemmatizer = WordNetLemmatizer()
+
+
+    def lowercase(self, text:str):
+        return text.lower()
     
-    def normalize_text(self, text:str):
-        text= text.lower()
-        text = self.re.sub(r'\s+', ' ', text).strip()
-        return text
+    def convert_number(self, text:str):
+        temp_str = text.split()
+        new_string = []
+
+        for word in temp_str:
+            if word.isdigit():
+                temp = self.p.number_to_words(word)
+                new_string.append(temp)
+            else:
+                new_string.append(word)
+
+        return ' '.join(new_string)
+
+    def remove_punctuation(self, text:str):
+        translator = str.maketrans('', '', string.punctuation)
+        return text.translate(translator)
+    
+    def remove_whitespace(self, text:str):
+        return ' '.join(text.split())
     
     def remove_stopwords(self, text:str):
-        tokens = text.split()
-        filtered_tokens = [
-            word for word in tokens if word not in self.stopwords
+        word_tokens = word_tokenize(text)
+        filtered_text = [word for word in word_tokens if word not in self.stop_words]
+        return filtered_text
+    
+    def lemma_words(self, word_tokens:list):
+        lemmas = [
+            self.lemmatizer.lemmatize(word) for word in word_tokens
         ]
-        return " ".join(filtered_tokens)
+        return lemmas
 
-    def lemmatize_text(self, text:str):
-        doc = self.nlp(text)
-        lemmatized = [token.lemma_ for token in doc]
-        return " ".join(lemmatized)
-    
-    def get_synonyms(self, word:str):
-        synonyms = []
-        for syn in self.synsets(word):
-            for lemma in syn.lemmas():
-                synonyms.append(lemma.name())
-        
-        return synonyms[0] if synonyms else word
-    
-    def replace_with_synonyms(self, text:str):
-        tokens = text.split()
-        synonym_replaced = [
-            self.get_synonyms(word) for word in tokens
-        ]
-        return " ".join(synonym_replaced)
-    
     def __call__(self, text:str):
-        text = self.normalize_text(text)
-        text = self.remove_stopwords(text)
-        text = self.lemmatize_text(text)
-        text = self.replace_with_synonyms(text)
-        return text
+        text = self.lowercase(text)
+        text = self.convert_number(text)
+        text = self.remove_punctuation(text)
+        text = self.remove_whitespace(text)
+        word_tokens = self.remove_stopwords(text)
+        lemmatized_tokens = self.lemma_words(word_tokens)
+        return lemmatized_tokens
