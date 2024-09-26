@@ -1,11 +1,12 @@
-import torch, os, logging, json
+import torch, os, logging
 from urllib.parse import quote as url_quote
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_cors import CORS
 from utils.ImageTextSearchEngine import ImageTextSearchEngine
 from utils.Translation import Translation
 from utils.TextProcessor import TextProcessor
+from io import BytesIO
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +69,12 @@ def text_search():
         logging.error(f'Error in text-search: {str(e)}')
         return jsonify({'Error': str(e)}), 500
 
+
+@app.route('/download-csv', methods=['POST'])
+def export_csv():
+    data = request.json
+    output = image_text_search_engine.download_csv(data=data)
+    return send_file(output, as_attachment=True, download_name='output.csv', mimetype='text/csv')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

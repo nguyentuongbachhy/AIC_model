@@ -2,18 +2,19 @@ import string, re, inflect, nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+from nltk.stem.porter import PorterStemmer
 
-nltk.download('punkt_tab')
-nltk.download('woednet')
-nltk.download('stopwords')
+# nltk.download('punkt_tab')
+# nltk.download('woednet')
+# nltk.download('stopwords')
 
 class TextProcessor():
     def __init__(self):
         self.re = re
         self.p = inflect.engine()
         self.stop_words = set(stopwords.words("english"))
-        self.lemmatizer = WordNetLemmatizer()
-
+        self.wordnet_lemmatizer = WordNetLemmatizer()
+        self.porter_stemmer = PorterStemmer()
 
     def lowercase(self, text:str):
         return text.lower()
@@ -29,7 +30,7 @@ class TextProcessor():
             else:
                 new_string.append(word)
 
-        return ' '.join(new_string)
+        return " ".join(new_string)
 
     def remove_punctuation(self, text:str):
         translator = str.maketrans('', '', string.punctuation)
@@ -43,17 +44,21 @@ class TextProcessor():
         filtered_text = [word for word in word_tokens if word not in self.stop_words]
         return filtered_text
     
-    def lemma_words(self, word_tokens:list):
-        lemmas = [
-            self.lemmatizer.lemmatize(word) for word in word_tokens
-        ]
-        return lemmas
+    def stemming(self, tokens):
+        stem_text = [self.porter_stemmer(token) for token in tokens]
+        return stem_text
+
+    def lemmatizer(self, tokens):
+        lemm_text = [self.wordnet_lemmatizer.lemmatize(token) for token in tokens]
+        return lemm_text
+
 
     def __call__(self, text:str):
         text = self.lowercase(text)
         text = self.convert_number(text)
         text = self.remove_punctuation(text)
         text = self.remove_whitespace(text)
-        word_tokens = self.remove_stopwords(text)
-        lemmatized_tokens = self.lemma_words(word_tokens)
-        return lemmatized_tokens
+        tokens = self.remove_stopwords(text)
+        tokens = self.stemming(tokens)
+        tokens = self.lemmatizer(tokens)
+        return " ".join(tokens)

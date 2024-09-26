@@ -1,9 +1,9 @@
-import json, faiss, mysql.connector, clip, torch, requests, os, numpy as np
+import json, faiss, mysql.connector, os, numpy as np
 from dotenv import load_dotenv
 
 load_dotenv()
 
-FOLDER_PATH = 'D:/AIC/model/assets/results'
+FOLDER_PATH = 'D:/AIC/model/assets/storage'
 
 db_config = {
     'host': os.getenv('DB_HOST'),

@@ -1,4 +1,4 @@
-import faiss, mysql.connector, clip, torch, requests, numpy as np
+import faiss, mysql.connector, clip, torch, requests, numpy as np, pandas as pd
 from PIL import Image
 from langdetect import detect
 from io import BytesIO
@@ -87,11 +87,9 @@ class ImageTextSearchEngine:
         else:
             translated_text = text
         
-        lemmatized_tokens = self.text_preprocessing(translated_text)
+        processed_text = self.text_preprocessing(translated_text)
 
-        print(lemmatized_tokens)
-
-        text_tokenized = clip.tokenize(lemmatized_tokens).to(self.device)
+        text_tokenized = clip.tokenize(processed_text).to(self.device)
 
         with torch.no_grad():
             text_vector = self.model.encode_text(text_tokenized).cpu().numpy()
@@ -102,10 +100,32 @@ class ImageTextSearchEngine:
             print(indices)
             if len(indices) == 0:
                 return []
-            
-            id_tuple = tuple(int(i) for i in indices)
+
+            id_tuple = tuple(indices)
 
             return self.get_image_feature_by_tuple(id_tuple)
+
+    def download_csv(self, data):
+        def handle_folder_id(id):
+            if id < 10:
+                return f'0{id}'
+            return f'{id}'
+        
+        def handle_subfolder_id(id):
+            if id < 10:
+                return f'00{id}'
+            return f'0{id}'
+        
+        df = pd.DataFrame({
+            'Folder': [f'L{handle_folder_id(row["folder_id"])}_V{handle_subfolder_id(row["child_folder_id"])}' for row in data],
+            'Frame index': [row['frame_mapping_index'] for row in data]
+        })
+
+        output = BytesIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+
+        return output
 
     def close(self):
         self.db_cursor.close()
