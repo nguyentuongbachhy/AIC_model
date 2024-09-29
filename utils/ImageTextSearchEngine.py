@@ -1,7 +1,8 @@
-import faiss, mysql.connector, clip, torch, requests, numpy as np, pandas as pd
-from PIL import Image
+import faiss, mysql.connector, torch, numpy as np, pandas as pd
 from langdetect import detect
 from io import BytesIO
+from transformers import CLIPModel, CLIPProcessor, CLIPTokenizer
+
 
 
 class ImageTextSearchEngine:
@@ -10,7 +11,9 @@ class ImageTextSearchEngine:
         self.db_connection = mysql.connector.connect(**db_config)
         self.db_cursor = self.db_connection.cursor()
         self.device = device
-        self.model, self.preprocess = clip.load(clip_backbone, device=device)
+        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+        self.clip_preprocess = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+        self.clip_tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         self.translator = translator
         self.text_preprocessing = text_preprocessing
         self.index = self.load_faiss_index(bin_file)
@@ -89,19 +92,19 @@ class ImageTextSearchEngine:
         
         processed_text = self.text_preprocessing(translated_text)
 
-        text_tokenized = clip.tokenize(processed_text).to(self.device)
+        text_tokenized = self.clip_tokenizer(processed_text, return_tensors='pt').to(self.device)
 
         with torch.no_grad():
-            text_vector = self.model.encode_text(text_tokenized).cpu().numpy()
-            text_vector = self.normalize(text_vector)
-            _, indices = self.index.search(text_vector, k)
+            text_embedding = self.clip_model.get_text_features(**text_tokenized).cpu().numpy()
+            text_embedding = self.normalize(text_embedding)
+            _, indices = self.index.search(text_embedding, k)
 
             indices = indices.flatten()
             print(indices)
             if len(indices) == 0:
                 return []
 
-            id_tuple = tuple(indices)
+            id_tuple = tuple(int(i) for i in indices)
 
             return self.get_image_feature_by_tuple(id_tuple)
 

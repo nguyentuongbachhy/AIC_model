@@ -12,6 +12,7 @@ class TextProcessor():
     def __init__(self):
         self.re = re
         self.p = inflect.engine()
+        self.word_tokenize = word_tokenize
         self.stop_words = set(stopwords.words("english"))
         self.wordnet_lemmatizer = WordNetLemmatizer()
         self.porter_stemmer = PorterStemmer()
@@ -39,13 +40,16 @@ class TextProcessor():
     def remove_whitespace(self, text:str):
         return ' '.join(text.split())
     
-    def remove_stopwords(self, text:str):
-        word_tokens = word_tokenize(text)
-        filtered_text = [word for word in word_tokens if word not in self.stop_words]
+    def tokenize(self, text:str):
+        word_tokens = self.word_tokenize(text)
+        return word_tokens
+    
+    def remove_stopwords(self, tokens):
+        filtered_text = [token for token in tokens if token not in self.stop_words]
         return filtered_text
     
     def stemming(self, tokens):
-        stem_text = [self.porter_stemmer(token) for token in tokens]
+        stem_text = [self.porter_stemmer.stem(token) for token in tokens]
         return stem_text
 
     def lemmatizer(self, tokens):
@@ -54,11 +58,12 @@ class TextProcessor():
 
 
     def __call__(self, text:str):
-        text = self.lowercase(text)
-        text = self.convert_number(text)
-        text = self.remove_punctuation(text)
         text = self.remove_whitespace(text)
-        tokens = self.remove_stopwords(text)
+        text = self.remove_punctuation(text)
+        text = self.convert_number(text)
+        text = self.lowercase(text)
+        tokens = self.tokenize(text)
+        tokens = self.remove_stopwords(tokens)
         tokens = self.stemming(tokens)
         tokens = self.lemmatizer(tokens)
         return " ".join(tokens)

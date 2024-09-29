@@ -1,12 +1,15 @@
-import os, json, torch, requests, concurrent.futures
+import os, json, torch, requests, concurrent.futures, time
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
+from io import BytesIO
 
 
 class ImageProcessor:
-    def __init__(self, device, max_threads=6):
+    def __init__(self, device, max_threads=6, max_retries=3, retry_delay=5):
         self.device = device
         self.max_threads = max_threads
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
         self.clip_preprocess = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
@@ -42,7 +45,33 @@ class ImageProcessor:
             print(f"Error saving JSON to {filepath}: {e}")
 
     def open_image(self, image_url):
-        return Image.open(requests.get(image_url, stream=True).raw)
+        attempt = 0  # Counter for retry attempts
+        while attempt < self.max_retries:
+            try:
+                # Fetch the image from the URL
+                response = requests.get(image_url)
+                response.raise_for_status()
+
+                # Use BytesIO to open the image
+                image_data = BytesIO(response.content)
+                image = Image.open(image_data)
+                image = image.convert('RGB')  # Convert to RGB to handle different formats
+                return image
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching the image from {image_url} (attempt {attempt + 1}/{self.max_retries}): {e}")
+            except (IOError, OSError) as e:
+                print(f"Error opening the image from {image_url} (attempt {attempt + 1}/{self.max_retries}): {e}")
+
+            # Increment the attempt counter and wait before retrying
+            attempt += 1
+            if attempt < self.max_retries:
+                print(f"Waiting {self.retry_delay} seconds before retrying...")
+                time.sleep(self.retry_delay)
+
+        # Return None if all attempts fail
+        print(f"Failed to open image from {image_url} after {self.max_retries} attempts.")
+        return None
 
     def extract_clip_features(self, image):
         inputs = self.clip_preprocess(images=image, return_tensors="pt").to(device)
@@ -143,8 +172,9 @@ class ImageProcessor:
 
     def process_images_in_folder(self, root_folder):
         
-        for filename in os.listdir(root_folder):
-            filepath = f'{root_folder}/{filename}'
+        for file in os.listdir(root_folder):
+            filename = file.replace("_details.json", "")
+            filepath = f'{root_folder}/{file}'
             self.process_images_in_jsonfile(filename, filepath)
         
         print('Successfully processed all folders')
